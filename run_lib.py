@@ -4,9 +4,10 @@ from rich import print as pprint
 from lib.sde_lib import VESDE
 from lib.model import Model
 from lib.utils import get_score_fn
-from lib.sampling import EulerMaruyamaPredictor
+from lib.sampling import sample
 import tqdm
 import matplotlib.pyplot as plt 
+
 if __name__ == "__main__":
     # device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -37,7 +38,7 @@ if __name__ == "__main__":
 
     num_epoch = 10000
     optim = torch.optim.Adam(model.parameters(), lr=0.001)
-    mu = 5
+    mu = 6
     sigma = 2
 
     loss_array = []
@@ -45,7 +46,22 @@ if __name__ == "__main__":
 
 
     for epoch in range(num_epoch):
-        x = torch.randn(3000)*sigma + mu
+        # x = (torch.randn(3000)*sigma + mu - 10) + (torch.randn(3000)*sigma + mu + 10)
+        ###
+        # Means and stds of two Gaussians
+        mu = torch.tensor([-3.0, 3.0, 9.0, 15])
+        sigma = torch.tensor([1.0, 1.0, 1.0, 1.0])
+
+        # Randomly choose which Gaussian each sample comes from
+        choices = torch.randint(0, 4, (3000,))  # 0 or 1
+
+        # Sample from standard normal
+        z = torch.randn(3000)
+
+        # Transform using chosen mean and sigma
+        x = mu[choices] + sigma[choices] * z
+
+        ###
         x = x.unsqueeze(1)
         x = x.to(device)
         batch = x
@@ -72,43 +88,44 @@ if __name__ == "__main__":
         if epoch % 50 == 0:
             pprint("\nepoch: {} and loss is {}".format(epoch, loss.item()))
 
-score_fn = get_score_fn(sde, model)
+    x_mean = sample(sde, model)
+    arr_np = x_mean.squeeze().detach().cpu().numpy()   # shape [200]
+    # Set bin width
+    bin_width = 0.5
+    bins = np.arange(min(arr_np), max(arr_np) + bin_width, bin_width)
 
-sampler = EulerMaruyamaPredictor(sde = sde, score_fn = score_fn)
-num_samples = 1000
-shape = [num_samples, 1]
-x = sde.prior_sampling(shape).to(device)
-print(x.size())
-timesteps = torch.linspace(sde.T, eps, sde.N, device=device)
+    # z = torch.rand(1000).squeeze().cpu().numpy()*sigma + mu
 
-for i in tqdm.tqdm(range(sde.N)):
-    t = torch.ones(shape[0], device=device) * timesteps[i]
-    x, x_mean = sampler.update_fn(x, t)
+    ###
+    # Means and stds of two Gaussians
+    mu = torch.tensor([-3.0, 3.0, 9.0, 15])
+    sigma = torch.tensor([1.0, 1.0, 1.0, 1.0])
 
-# pprint(x_mean)
-# pprint(x_mean.shape)
+    # Randomly choose which Gaussian each sample comes from
+    choices = torch.randint(0, 4, (1000,))  # 0 or 1
 
-# Convert to 1D numpy array for plotting
-arr_np = x_mean.squeeze().detach().cpu().numpy()   # shape [200]
-# Set bin width
-bin_width = 0.5
-bins = np.arange(min(arr_np), max(arr_np) + bin_width, bin_width)
+    # Sample from standard normal
+    z = torch.randn(1000)
 
-z = torch.randn(1000).squeeze().cpu().numpy()*sigma + mu
-# Plot
-plt.hist(arr_np, bins=bins, alpha = 0.5, label = "diffusion")
-plt.hist(z, bins=bins, histtype="step", edgecolor="black", linewidth=0.5, label = "exact")
+    # Transform using chosen mean and sigma
+    z = mu[choices] + sigma[choices] * z
+    z = z.cpu().numpy()
 
-plt.xlabel("x")
-plt.ylabel("Frequency")
-plt.legend()
-plt.savefig("assets/hist1d.png")
-plt.close()
+    ###
+    # Plot
+    plt.hist(arr_np, bins=bins, alpha = 0.5, label = "diffusion")
+    plt.hist(z, bins=bins, histtype="step", edgecolor="black", linewidth=0.5, label = "exact")
 
-mean = np.mean(arr_np)
-var = np.var(arr_np)
+    plt.xlabel("x")
+    plt.ylabel("Frequency")
+    plt.legend()
+    plt.savefig("assets/hist1d.png")
+    plt.close()
 
-pprint("--------------------------")
-pprint("mean is {}".format(mean))
-pprint("variance is {}".format(var))
-pprint("--------------------------")
+    mean = np.mean(arr_np)
+    var = np.var(arr_np)
+
+    pprint("--------------------------")
+    pprint("mean is {}".format(mean))
+    pprint("variance is {}".format(var))
+    pprint("--------------------------")
