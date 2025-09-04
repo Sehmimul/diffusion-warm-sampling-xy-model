@@ -1,5 +1,7 @@
 import torch
 import numpy as np
+from lib.utils import get_score_fn
+import tqdm
 
 class EulerMaruyamaPredictor:
   def __init__(self, sde, score_fn):
@@ -16,7 +18,7 @@ class EulerMaruyamaPredictor:
     return x, x_mean
 
 
-def sample(sde, model, num_samples = 1000):
+def sample(sde, model, num_samples = 1000, eps=1e-5, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
     score_fn = get_score_fn(sde, model)
     sampler = EulerMaruyamaPredictor(sde = sde, score_fn = score_fn)
     shape = [num_samples, 1]

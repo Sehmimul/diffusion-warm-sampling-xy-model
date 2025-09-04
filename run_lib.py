@@ -88,7 +88,7 @@ if __name__ == "__main__":
         if epoch % 50 == 0:
             pprint("\nepoch: {} and loss is {}".format(epoch, loss.item()))
 
-    x_mean = sample(sde, model)
+    x_mean = sample(sde, model, eps = eps)
     arr_np = x_mean.squeeze().detach().cpu().numpy()   # shape [200]
     # Set bin width
     bin_width = 0.5
