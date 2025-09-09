@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from lib.utils import get_score_fn
 import tqdm
+import warnings
 
 class EulerMaruyamaPredictor:
   def __init__(self, sde, score_fn):
@@ -21,7 +22,8 @@ class EulerMaruyamaPredictor:
 def sample(sde, model, num_samples = 1000, eps=1e-5, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
     score_fn = get_score_fn(sde, model)
     sampler = EulerMaruyamaPredictor(sde = sde, score_fn = score_fn)
-    shape = [num_samples, 1]
+    shape = [num_samples, 1] # the shape has been hardcoded!
+    warnings.warn("shape is hardcoded")
     x = sde.prior_sampling(shape).to(device)
     timesteps = torch.linspace(sde.T, eps, sde.N, device=device)
     for i in tqdm.tqdm(range(sde.N)):
