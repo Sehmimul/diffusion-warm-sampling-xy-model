@@ -44,7 +44,7 @@ class Model(nn.Module):
         x = self.fc2(x)
         x = self.drop1(x)
         x = torch.tanh(self.fc3(x))
-        x = self.drop2(x)
+        # x = self.drop2(x)
         x = self.fc4(x)
 
         return x
