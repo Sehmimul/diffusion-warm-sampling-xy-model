@@ -3,111 +3,65 @@ import numpy as np
 from rich import print as pprint
 from lib.sde_lib import VESDE
 from lib.model import Model
-from lib.utils import get_score_fn
 from lib.sampling import sample
 import tqdm
 import matplotlib.pyplot as plt 
+from config import ModelConfig
+from train import train_step
+from data.gaussian import gaussian_mixture_data
 
 if __name__ == "__main__":
-    # device
+
+    config = ModelConfig()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # config
-    sigma_min=0.01
-    sigma_max=50
-    N=1000
-    eps=1e-5
-
-    # data
-    x = torch.randn(10000)*2 + 5
-    x = x.to(device)
-
-    t = 1
-    t = torch.tensor(t).to(device)
-
-    
-
-    sde = VESDE(sigma_min = sigma_min, sigma_max = sigma_max, N = N)
+    sde = VESDE(sigma_min = config.sigma_min, sigma_max = config.sigma_max, N = config.N)
 
     model = Model().to(device)
+    optim = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
 
-    t = torch.ones(x.shape).to(device)*t
-    x = x.unsqueeze(1)
 
-    out = model(x,t)
-
-    num_epoch = 10000
-    optim = torch.optim.Adam(model.parameters(), lr=0.001)
-    mu = 6
-    sigma = 2
+    mu = [-3.0, 3.0, 9.0, 15]
+    sigma = [1.0, 1.0, 1.0, 1.0]
+    train_loader, val_loader, test_loader = gaussian_mixture_data(mu = mu  
+                                                                sigma = sigma, 
+                                                                num_samples = 10000,
+                                                                config = config,
+                                                                device = device)
 
     loss_array = []
-    batch = x
 
 
-    for epoch in range(num_epoch):
-        # x = (torch.randn(3000)*sigma + mu - 10) + (torch.randn(3000)*sigma + mu + 10)
-        ###
-        # Means and stds of two Gaussians
-        mu = torch.tensor([-3.0, 3.0, 9.0, 15])
-        sigma = torch.tensor([1.0, 1.0, 1.0, 1.0])
+    for epoch in range(config.num_epochs):
 
-        # Randomly choose which Gaussian each sample comes from
-        choices = torch.randint(0, 4, (3000,))  # 0 or 1
+        for batch in train_loader:
+            loss = train_step(config, batch, model, sde, optim)
+            loss_array.append(loss.item())
 
-        # Sample from standard normal
-        z = torch.randn(3000)
-
-        # Transform using chosen mean and sigma
-        x = mu[choices] + sigma[choices] * z
-
-        ###
-        x = x.unsqueeze(1)
-        x = x.to(device)
-        batch = x
-
-        model.train()
-        
-        score_fn = get_score_fn(sde, model)
-        t = torch.rand(batch.shape[0], device=batch.device) * (sde.T - eps) + eps
-        z = torch.randn_like(batch)
-        mean, std = sde.marginal_prob(batch, t)
-        perturbed_data = mean + std[:, None] * z
-        score = score_fn(perturbed_data, t)
-
-        losses = torch.square(score * std[:, None] + z)
-        losses = torch.mean(losses.reshape(losses.shape[0], -1), dim=-1)
-        loss = torch.mean(losses)
-
-        optim.zero_grad()
-        loss.backward()
-        optim.step()
-
-        loss_array.append(loss.item())
-            # progress.display(current_iteration)
         if epoch % 50 == 0:
-            pprint("\nepoch: {} and loss is {}".format(epoch, loss.item()))
+            for batch in val_loader:
+                val_loss = train_step(config, batch, model, sde, optim, train = False)
+            pprint("\nepoch: {} and training loss is {}\tvalidation loss is {}".format(epoch, loss.item(), val_loss.item()))
 
-    x_mean = sample(sde, model, eps = eps)
+    for batch in test_loader:
+        test_loss = train_step(config, batch, model, sde, optim, train = False)
+        pprint("Test loss is {}".format(test_loss.item()))
+
+
+    # code to generate samples
+    x_mean = sample(sde, model, eps = config.eps)
     arr_np = x_mean.squeeze().detach().cpu().numpy()   # shape [200]
     # Set bin width
     bin_width = 0.5
     bins = np.arange(min(arr_np), max(arr_np) + bin_width, bin_width)
 
-    # z = torch.rand(1000).squeeze().cpu().numpy()*sigma + mu
+    mu = mu
+    sigma = sigma
 
-    ###
-    # Means and stds of two Gaussians
-    mu = torch.tensor([-3.0, 3.0, 9.0, 15])
-    sigma = torch.tensor([1.0, 1.0, 1.0, 1.0])
-
-    # Randomly choose which Gaussian each sample comes from
     choices = torch.randint(0, 4, (1000,))  # 0 or 1
 
-    # Sample from standard normal
     z = torch.randn(1000)
 
-    # Transform using chosen mean and sigma
     z = mu[choices] + sigma[choices] * z
     z = z.cpu().numpy()
 

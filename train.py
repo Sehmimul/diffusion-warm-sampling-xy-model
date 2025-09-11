@@ -18,8 +18,9 @@ def train_step(config, batch, model, sde, optim, train = True):
     losses = torch.mean(losses.reshape(losses.shape[0], -1), dim=-1)
     loss = torch.mean(losses)
 
-    optim.zero_grad()
-    loss.backward()
-    optim.step()
+    if train == True:    
+        optim.zero_grad()
+        loss.backward()
+        optim.step()
 
     return loss
