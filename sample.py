@@ -127,7 +127,109 @@ def same_every_beta(
                     "T": 1/beta,
                     "L": L
                 })
+                # C(r) plot
+                R = len(C_r_mala)
+                assert len(C_r_diff) == R
+                assert len(C_r) == R
 
+                r = np.arange(R)
+
+                fig, ax = plt.subplots(figsize=(6, 4))
+                colors = {
+                    "mala": "#0072B2",       # blue
+                    "corrected": "#D55E00",  # vermillion
+                    "diffusion": "#009E73",  # green
+                }
+
+                ax.plot(r, C_r_mala, label="MALA", linewidth=1, alpha = 0.5, marker = 's', linestyle = '--', color=colors["mala"])
+                ax.plot(r, C_r, label="Corrected", linewidth=1, alpha = 0.5, marker="x", linestyle = '-', color=colors["corrected"])
+                ax.plot(r, C_r_diff, label="Diffusion", linewidth=1, alpha = 0.5, marker = "o", linestyle = '--', color=colors["diffusion"])
+
+                ax.set_xlabel("r")
+                ax.set_ylabel("C(r)")
+                ax.set_title(f"C(r) vs r (beta = {beta}, L = {L})")
+                ax.legend()
+                ax.grid(True)
+
+                wandb.log({
+                    "C_r_plot": wandb.Image(fig),
+                })
+
+                plt.close(fig)
+
+                # C(r) log plot
+                R = len(C_r_mala)
+                assert len(C_r_diff) == R
+                assert len(C_r) == R
+
+                r = np.arange(R)
+
+                fig, ax = plt.subplots(figsize=(6, 4))
+                colors = {
+                    "mala": "#0072B2",       # blue
+                    "corrected": "#D55E00",  # vermillion
+                    "diffusion": "#009E73",  # green
+                }
+
+                ax.plot(r, C_r_mala, label="MALA", linewidth=1, alpha = 0.5, marker = 's', linestyle = '--', color=colors["mala"])
+                ax.plot(r, C_r, label="Corrected", linewidth=1, alpha = 0.5, marker="x", linestyle = '-', color=colors["corrected"])
+                ax.plot(r, C_r_diff, label="Diffusion", linewidth=1, alpha = 0.5, marker = "o", linestyle = '--', color=colors["diffusion"])
+                ax.set_yscale('log')
+                ax.set_xlabel("r")
+                ax.set_ylabel("C(r)")
+                ax.set_title(f"C(r) vs r [log plot] (beta = {beta}, L = {L})")
+                ax.legend()
+                ax.grid(True)
+
+                wandb.log({
+                    "C_r_log_plot": wandb.Image(fig),
+                })
+
+                plt.close(fig)
+
+
+                # plot energy diagram
+                # plot histograms
+                fig, ax = plt.subplots(figsize=(6, 4))
+
+
+                ax.hist(
+                    energies_mala,
+                    bins=50,
+                    density=True,
+                    histtype="step",
+                    linewidth=2,
+                    label="MALA",
+                    alpha = 0.5
+                )
+                ax.hist(
+                    energies,
+                    bins=50,
+                    density=True,
+                    histtype="step",
+                    linewidth=2,
+                    label="Corrected",
+                    alpha = 0.5
+                )
+                ax.hist(
+                    energies_diff,
+                    bins=50,
+                    density=True,
+                    histtype="step",
+                    linewidth=1,
+                    label="Diffusion",
+                    alpha = 0.5
+                )
+                ax.set_xlabel("Energy")
+                ax.set_ylabel("Density")
+                ax.set_title(f"Energy distribution (beta = {beta}, L = {L})")
+                ax.grid(alpha=0.3)
+                ax.legend()
+
+                wandb.log({
+                    "Energy plot": wandb.Image(fig),
+                })
+                plt.close(fig)     
 
 if __name__ == "__main__":
     same_every_beta()
