@@ -10,23 +10,33 @@ class EulerMaruyamaPredictor:
     self.sde = sde
     self.score_fn = score_fn
 
-  def update_fn(self, x, t):
+  def update_fn(self, x, t, guidance_scale, beta):
     dt = -1. / self.sde.N
     z = torch.randn_like(x)
-    drift, diffusion = self.sde.reverse_sde(x, t, self.score_fn)
+    drift, diffusion = self.sde.reverse_sde(x, t, self.score_fn, guidance_scale, beta)
     x_mean = x + drift * dt
     x = x_mean + diffusion[:, None] * np.sqrt(-dt) * z
     return x, x_mean
 
 
-def sample(sde, model, num_samples = 1000, eps=1e-5, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+def sample(sde, model, L = 20, guidance_scale = None, beta = None, num_samples = 1000, eps=1e-5, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+    model.eval()
     score_fn = get_score_fn(sde, model)
     sampler = EulerMaruyamaPredictor(sde = sde, score_fn = score_fn)
-    shape = [num_samples, 1] # the shape has been hardcoded!
+    shape = [num_samples,L*L] # the shape has been hardcoded!
     warnings.warn("shape is hardcoded")
     x = sde.prior_sampling(shape).to(device)
     timesteps = torch.linspace(sde.T, eps, sde.N, device=device)
-    for i in tqdm.tqdm(range(sde.N)):
-        t = torch.ones(shape[0], device=device) * timesteps[i]
-        x, x_mean = sampler.update_fn(x, t)
+    with torch.no_grad():
+
+      for i in tqdm.tqdm(range(sde.N)):
+          t = torch.ones(shape[0], device=device) * timesteps[i]
+          x, x_mean = sampler.update_fn(x, t, guidance_scale, beta)
+          # x = (x + np.pi) % (2*np.pi) - np.pi
+
+    num_samples = x_mean.size(0)
+    rand_angles = 2 * torch.pi * torch.rand(num_samples, 1)   # shape: (num_samples, 1)
+    rand_angles = rand_angles.to(device)
+    x_mean = x_mean + rand_angles
+
     return x_mean
