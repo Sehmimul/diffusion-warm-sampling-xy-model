@@ -4,11 +4,11 @@ import numpy as np
 from rich import print as pprint
 import matplotlib.pyplot as plt
 
-from mala import get_energy, mala_xy
-from helicity_modulus import ps
-from correlation import correlation_function_Cr
-from vortex import vortex_density_torch
-from magnetization import xy_magnetization_susceptibility
+from sandbox.mala import get_energy, mala_xy
+from sandbox.helicity_modulus import ps
+from sandbox.correlation import correlation_function_Cr
+from sandbox.vortex import vortex_density_torch
+from sandbox.magnetization import xy_magnetization_susceptibility
 
 import torch
 import math
@@ -152,161 +152,161 @@ def wolff_cluster_correct_xy(theta0, beta, n_steps=200, device=None, show_progre
         iterator = tqdm.tqdm(iterator, desc="Wolff updates")
     C_r_prev = []
     mse_list = []
-    energies_diff, E_mean_diff, Cv_diff, mean_ps_diff, rho_v_diff, C_r_diff, magnetization_diff, susceptibility_diff = diffusion_results
-    energies_mala, E_mean_mala, Cv_mala, mean_ps_mala, rho_v_mala, C_r_mala, magnetization_mala, susceptibility_mala = mala_results
+    # energies_diff, E_mean_diff, Cv_diff, mean_ps_diff, rho_v_diff, C_r_diff, magnetization_diff, susceptibility_diff = diffusion_results
+    # energies_mala, E_mean_mala, Cv_mala, mean_ps_mala, rho_v_mala, C_r_mala, magnetization_mala, susceptibility_mala = mala_results
 
     print("Staring Wolff")
-    with wandb.init(project=project) as run:
-        for step in iterator:
-            # apply one Wolff update per batch element
-            # for b in tqdm.tqdm(range(B)):
-            #     theta_b, sz = wolff_xy_update_single(theta[b], beta)
-            #     theta[b] = theta_b
-            #     cluster_sizes.append(sz)
+    # with wandb.init(project=project) as run:
+    for step in iterator:
+        # apply one Wolff update per batch element
+        # for b in tqdm.tqdm(range(B)):
+        #     theta_b, sz = wolff_xy_update_single(theta[b], beta)
+        #     theta[b] = theta_b
+        #     cluster_sizes.append(sz)
 
-            results = Parallel(n_jobs=-1, prefer="processes")(
-                delayed(wolff_xy_update_single)(theta[b].clone(), beta)
-                for b in tqdm.tqdm(range(B))
+        results = Parallel(n_jobs=-1, prefer="processes")(
+            delayed(wolff_xy_update_single)(theta[b].clone(), beta)
+            for b in tqdm.tqdm(range(B))
+        )
+
+        for b, (theta_b, sz) in enumerate(results):
+            theta[b].copy_(theta_b)   # in-place torch update
+            cluster_sizes.append(sz)
+
+        theta_cpu = theta.detach().cpu().numpy()
+        """
+        if step % 10 == 0:
+            energies, E_mean, Cv, mean_ps, rho_v, C_r, magnetization, susceptibility = get_metrics(theta_cpu = theta_cpu, L = L, beta = beta)
+
+            run.log({
+                "Expected Energy/corrected": E_mean,
+                "Expected Energy/diffusion": E_mean_diff,
+                "Expected Energy/mala": E_mean_mala,
+                "Heat Capacity/corrected": Cv, 
+                "Heat Capacity/diffusion": Cv_diff,
+                "Heat Capacity/mala": Cv_mala,
+                "Helicity Modulus/corrected": mean_ps,
+                "Helicity Modulus/diffusion": mean_ps_diff,
+                "Helicity Modulus/mala": mean_ps_mala,                
+                "Vortex Density/corrected": rho_v,
+                "Vortex Density/diffusion": rho_v_diff,
+                "Vortex Density/mala": rho_v_mala,
+                "magnetization/corrected": magnetization,
+                "magnetization/diffusion": magnetization_diff,
+                "magnetization/mala": magnetization_mala,
+                "susceptibility/corrected": susceptibility,
+                "susceptibility/diffusion": susceptibility_diff,
+                "susceptibility/mala": susceptibility_mala,
+                "beta": beta,
+                "L": L
+            })
+
+
+            # C(r) plot
+            R = len(C_r_mala)
+            assert len(C_r_diff) == R
+            assert len(C_r) == R
+
+            r = np.arange(R)
+
+            fig, ax = plt.subplots(figsize=(6, 4))
+            colors = {
+                "mala": "#0072B2",       # blue
+                "corrected": "#D55E00",  # vermillion
+                "diffusion": "#009E73",  # green
+            }
+
+            ax.plot(r, C_r_mala, label="MALA", linewidth=1, alpha = 0.5, marker = 's', linestyle = '--', color=colors["mala"])
+            ax.plot(r, C_r, label="Corrected", linewidth=1, alpha = 0.5, marker="x", linestyle = '-', color=colors["corrected"])
+            ax.plot(r, C_r_diff, label="Diffusion", linewidth=1, alpha = 0.5, marker = "o", linestyle = '--', color=colors["diffusion"])
+
+            ax.set_xlabel("r")
+            ax.set_ylabel("C(r)")
+            ax.set_title(f"C(r) vs r (step = {step})")
+            ax.legend()
+            ax.grid(True)
+
+            wandb.log({
+                "C_r_plot": wandb.Image(fig),
+            })
+
+            plt.close(fig)
+
+            # C(r) log plot
+            R = len(C_r_mala)
+            assert len(C_r_diff) == R
+            assert len(C_r) == R
+
+            r = np.arange(R)
+
+            fig, ax = plt.subplots(figsize=(6, 4))
+            colors = {
+                "mala": "#0072B2",       # blue
+                "corrected": "#D55E00",  # vermillion
+                "diffusion": "#009E73",  # green
+            }
+
+            ax.plot(r, C_r_mala, label="MALA", linewidth=1, alpha = 0.5, marker = 's', linestyle = '--', color=colors["mala"])
+            ax.plot(r, C_r, label="Corrected", linewidth=1, alpha = 0.5, marker="x", linestyle = '-', color=colors["corrected"])
+            ax.plot(r, C_r_diff, label="Diffusion", linewidth=1, alpha = 0.5, marker = "o", linestyle = '--', color=colors["diffusion"])
+            ax.set_yscale('log')
+            ax.set_xlabel("r")
+            ax.set_ylabel("C(r)")
+            ax.set_title(f"C(r) vs r [log plot] (step = {step})")
+            ax.legend()
+            ax.grid(True)
+
+            wandb.log({
+                "C_r_log_plot": wandb.Image(fig),
+            })
+
+            plt.close(fig)
+
+
+            # plot energy diagram
+            # plot histograms
+            fig, ax = plt.subplots(figsize=(6, 4))
+
+
+            ax.hist(
+                energies_mala,
+                bins=50,
+                density=True,
+                histtype="step",
+                linewidth=2,
+                label="MALA",
+                alpha = 0.5
             )
+            ax.hist(
+                energies,
+                bins=50,
+                density=True,
+                histtype="step",
+                linewidth=2,
+                label="Corrected",
+                alpha = 0.5
+            )
+            ax.hist(
+                energies_diff,
+                bins=50,
+                density=True,
+                histtype="step",
+                linewidth=1,
+                label="Diffusion",
+                alpha = 0.5
+            )
+            ax.set_xlabel("Energy")
+            ax.set_ylabel("Density")
+            ax.set_title(f"Energy distribution (step = {step})")
+            ax.grid(alpha=0.3)
+            ax.legend()
 
-            for b, (theta_b, sz) in enumerate(results):
-                theta[b].copy_(theta_b)   # in-place torch update
-                cluster_sizes.append(sz)
+            wandb.log({
+                "Energy plot": wandb.Image(fig),
+            })
+            plt.close(fig)     
 
-            theta_cpu = theta.detach().cpu().numpy()
-
-            if step % 10 == 0:
-                energies, E_mean, Cv, mean_ps, rho_v, C_r, magnetization, susceptibility = get_metrics(theta_cpu = theta_cpu, L = L, beta = beta)
-
-                run.log({
-                    "Expected Energy/corrected": E_mean,
-                    "Expected Energy/diffusion": E_mean_diff,
-                    "Expected Energy/mala": E_mean_mala,
-                    "Heat Capacity/corrected": Cv, 
-                    "Heat Capacity/diffusion": Cv_diff,
-                    "Heat Capacity/mala": Cv_mala,
-                    "Helicity Modulus/corrected": mean_ps,
-                    "Helicity Modulus/diffusion": mean_ps_diff,
-                    "Helicity Modulus/mala": mean_ps_mala,                
-                    "Vortex Density/corrected": rho_v,
-                    "Vortex Density/diffusion": rho_v_diff,
-                    "Vortex Density/mala": rho_v_mala,
-                    "magnetization/corrected": magnetization,
-                    "magnetization/diffusion": magnetization_diff,
-                    "magnetization/mala": magnetization_mala,
-                    "susceptibility/corrected": susceptibility,
-                    "susceptibility/diffusion": susceptibility_diff,
-                    "susceptibility/mala": susceptibility_mala,
-                    "beta": beta,
-                    "L": L
-                })
-
-
-                # C(r) plot
-                R = len(C_r_mala)
-                assert len(C_r_diff) == R
-                assert len(C_r) == R
-
-                r = np.arange(R)
-
-                fig, ax = plt.subplots(figsize=(6, 4))
-                colors = {
-                    "mala": "#0072B2",       # blue
-                    "corrected": "#D55E00",  # vermillion
-                    "diffusion": "#009E73",  # green
-                }
-
-                ax.plot(r, C_r_mala, label="MALA", linewidth=1, alpha = 0.5, marker = 's', linestyle = '--', color=colors["mala"])
-                ax.plot(r, C_r, label="Corrected", linewidth=1, alpha = 0.5, marker="x", linestyle = '-', color=colors["corrected"])
-                ax.plot(r, C_r_diff, label="Diffusion", linewidth=1, alpha = 0.5, marker = "o", linestyle = '--', color=colors["diffusion"])
-
-                ax.set_xlabel("r")
-                ax.set_ylabel("C(r)")
-                ax.set_title(f"C(r) vs r (step = {step})")
-                ax.legend()
-                ax.grid(True)
-
-                wandb.log({
-                    "C_r_plot": wandb.Image(fig),
-                })
-
-                plt.close(fig)
-
-                # C(r) log plot
-                R = len(C_r_mala)
-                assert len(C_r_diff) == R
-                assert len(C_r) == R
-
-                r = np.arange(R)
-
-                fig, ax = plt.subplots(figsize=(6, 4))
-                colors = {
-                    "mala": "#0072B2",       # blue
-                    "corrected": "#D55E00",  # vermillion
-                    "diffusion": "#009E73",  # green
-                }
-
-                ax.plot(r, C_r_mala, label="MALA", linewidth=1, alpha = 0.5, marker = 's', linestyle = '--', color=colors["mala"])
-                ax.plot(r, C_r, label="Corrected", linewidth=1, alpha = 0.5, marker="x", linestyle = '-', color=colors["corrected"])
-                ax.plot(r, C_r_diff, label="Diffusion", linewidth=1, alpha = 0.5, marker = "o", linestyle = '--', color=colors["diffusion"])
-                ax.set_yscale('log')
-                ax.set_xlabel("r")
-                ax.set_ylabel("C(r)")
-                ax.set_title(f"C(r) vs r [log plot] (step = {step})")
-                ax.legend()
-                ax.grid(True)
-
-                wandb.log({
-                    "C_r_log_plot": wandb.Image(fig),
-                })
-
-                plt.close(fig)
-
-
-                # plot energy diagram
-                # plot histograms
-                fig, ax = plt.subplots(figsize=(6, 4))
-
-
-                ax.hist(
-                    energies_mala,
-                    bins=50,
-                    density=True,
-                    histtype="step",
-                    linewidth=2,
-                    label="MALA",
-                    alpha = 0.5
-                )
-                ax.hist(
-                    energies,
-                    bins=50,
-                    density=True,
-                    histtype="step",
-                    linewidth=2,
-                    label="Corrected",
-                    alpha = 0.5
-                )
-                ax.hist(
-                    energies_diff,
-                    bins=50,
-                    density=True,
-                    histtype="step",
-                    linewidth=1,
-                    label="Diffusion",
-                    alpha = 0.5
-                )
-                ax.set_xlabel("Energy")
-                ax.set_ylabel("Density")
-                ax.set_title(f"Energy distribution (step = {step})")
-                ax.grid(alpha=0.3)
-                ax.legend()
-
-                wandb.log({
-                    "Energy plot": wandb.Image(fig),
-                })
-                plt.close(fig)     
-
-
+        """
     avg_cluster_size = float(np.mean(cluster_sizes)) if len(cluster_sizes) else 0.0
     return theta, avg_cluster_size, cluster_sizes, mse_list
 

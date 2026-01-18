@@ -59,26 +59,29 @@ def mala_xy(L=4, steps=10000, epsilon=0.01, beta=1.0, eq_cutoff = 200):
 
     return samples
 
-def get_energy(L = 3, beta = 15, num_samples = 4000, steps=20000, eq_cutoff = 200):
-    samples = []
+def get_energy(L = 3, beta = 15, steps=20000, eq_cutoff = 200, samples = None):
     energies = []
-    samples = mala_xy(L=L, steps=steps, epsilon=0.15, beta = beta, eq_cutoff = eq_cutoff)
+    if samples is None:
+        samples = mala_xy(L=L, steps=steps, epsilon=0.15, beta = beta, eq_cutoff = eq_cutoff)
     for i in tqdm.tqdm(range(len(samples))):
         energy =  xy_energy(samples[i], L = L)
         energies.append(energy)
     return samples, energies
 
 if __name__ == "__main__":
-    beta = 5
-    samples, energies = get_energy(L = 3, beta = beta, num_samples = 10000, steps = 200000, eq_cutoff = 200)
-    np.save('sandbox/assets/samples_beta_{}.npy'.format(beta), samples)
-    np.save('sandbox/assets/energies_beta_{}.npy'.format(beta), energies)
+    beta = 1.02
+    L = 10
+    print("L: {} beta: {}".format(L,beta))
+    samples, energies = get_energy(L = L, beta = beta, steps = 200000, eq_cutoff = 10000)
+    np.save('sandbox/assets/energies_beta_{}_L_{}.npy'.format(beta,L), energies)
+    # np.save('sandbox/assets/samples_beta_{}_L_{}.npy'.format(beta,L), samples)
+
     pprint("samples shape is {}".format(len(samples)))
     pprint("energies length is {}".format(len(energies)))
 
-    plt.hist(energies, bins = 200, alpha = 0.5)
+    plt.hist(energies, bins = 150, alpha = 0.5, density = True)
     plt.xlabel("Energies")
     plt.ylabel("Frequency")
     plt.title("Energy histogram")
-    plt.savefig("sandbox/assets/mala_energy_xy_beta_{}.png".format(beta))
+    plt.savefig("sandbox/assets/mala_energy_xy_beta_{}_L_{}.png".format(beta,L))
     plt.close()
