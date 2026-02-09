@@ -2,6 +2,7 @@ import numpy as np
 from rich import print as pprint
 import tqdm
 import matplotlib.pyplot as plt
+import torch
 
 def xy_energy(theta, L, J=1.0):
     theta = theta.reshape((L, L))
@@ -60,12 +61,11 @@ def mala_xy(L=4, steps=10000, epsilon=0.01, beta=1.0, eq_cutoff = 200):
     return samples
 
 def get_energy(L = 3, beta = 15, steps=20000, eq_cutoff = 200, samples = None):
-    energies = []
-    if samples is None:
-        samples = mala_xy(L=L, steps=steps, epsilon=0.15, beta = beta, eq_cutoff = eq_cutoff)
-    for i in tqdm.tqdm(range(len(samples))):
-        energy =  xy_energy(samples[i], L = L)
-        energies.append(energy)
+    theta = torch.from_numpy(samples)
+    right = torch.roll(theta, shifts=-1, dims=-1)
+    down  = torch.roll(theta, shifts=-1, dims=-2)
+    energies =  -(torch.cos(theta - right) + torch.cos(theta - down))
+    energies = energies.cpu().numpy()
     return samples, energies
 
 if __name__ == "__main__":
