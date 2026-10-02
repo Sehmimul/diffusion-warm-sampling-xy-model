@@ -17,36 +17,31 @@ class ModelConfig(BaseModel):
     train_split: float = 0.7
     val_split: float = 0.27
     variational = False
-    pre_trained = False
-
-    # variational
-    num_variational_samples: int = 500
-    min_ess_counter: int = 5
-    min_size: int = 100
-    ess_fraction: float = 1/50
+    pre_trained = True
+    checkpoint_name = 'model_checkpoint'
 
 class SamplingConfig(BaseModel):
     # configuration sampling from
     trained_size: int = 20
     L: int = 60
-    # beta_list: list = [0.5, 0.6, 0.7, 0.8, 0.82, 0.84, 0.86, 0.88, 0.9, 0.905, 0.91, 0.915, 0.92, 0.94, 0.96, 0.98, 1.0, 1.1, 1.2, 1.25, 1.3, 1.4, 1.5, 1.6]
-    beta_list: list = [0.9, 0.905, 0.91, 0.915, 0.92, 0.94, 0.96, 0.98, 1.0, 1.1, 1.2, 1.25, 1.3, 1.4, 1.5, 1.6]
 
-    num_samples: int = 10#2000
+    beta_list: list = [0.5, 0.6, 0.7, 0.8, 1, 1.2, 1.3, 1.4, 1.5, 1.6]
+
+    num_samples: int = 1000
 
     # sampling model checkpoint
-    checkpoint: str = 'model_L_20_cfg_all_T'
+    checkpoint: str = 'model_checkpoint'
 
     # wandb project
-    project_name: str = "sampling"
+    project_name: str = "mcmc"#sampling
 
     # classifier free guidance
     cfg: bool = True
-    guidance_scale: float = 1.05 # only for CFG
+    guidance_scale: float = 1.02 # only for CFG
 
     # Wolff correction
     wolff_correction: bool = True
-    wolff_correction_steps: int = 30
+    wolff_correction_steps: int = 15000
     wolff_correction_save_betas: list = [0.5, 1, 1.5]
     train_split: float = 0.7
     val_split: float = 0.27
@@ -70,5 +65,5 @@ class GaussianMixtureDataConfig(BaseModel):
 
 class XYDataConfig(BaseModel):
     # beta: float = 0.85
-    betas: list = [0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.2, 1.3, 1.4, 1.5, 1.6] #[0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    betas: list = [0.7, 0.8]
     L: list = [20]
