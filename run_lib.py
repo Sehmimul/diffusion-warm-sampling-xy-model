@@ -71,10 +71,6 @@ if __name__ == "__main__":
         train_loaders = [pair[0] for pair in loaders]
         val_loaders = [pair[1] for pair in loaders]
 
-    variational = config.variational
-    ess_counter = 0
-
-
     pre_trained = config.pre_trained
     if pre_trained == True:
         chkpt = config.checkpoint_name
