@@ -15,8 +15,6 @@ from lib.sampling import sample
 from config import ModelConfig, XYDataConfig
 from train import train_step
 
-from sandbox.helicity_modulus import ps
-
 from lib.wolff_correction import get_metrics, wolff_cluster_correct_xy
 
 def sample_single_beta(model, sde, model_config, sampling_config, beta: float = 1.0, L: int = 40):

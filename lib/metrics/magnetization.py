@@ -18,7 +18,7 @@ def xy_magnetization_susceptibility(theta, beta):
     # m_b = M / N                             # per-sample
     # m = m_b.mean()                          # ⟨·⟩ over batch
 
-    m = M.mean() / N
+    m = M / N
 
     # susceptibility
     term1 = (Mx**2 + My**2).mean()

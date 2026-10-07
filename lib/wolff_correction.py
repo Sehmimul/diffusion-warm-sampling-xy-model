@@ -3,10 +3,11 @@ import math, os
 import numpy as np
 from rich import print as pprint
 import matplotlib.pyplot as plt
-from sandbox.helicity_modulus import ps
-from sandbox.correlation import correlation_function_Cr
-from sandbox.vortex import vortex_density_torch
-from sandbox.magnetization import xy_magnetization_susceptibility
+from lib.metrics.energy import get_energy
+from lib.metrics.helicity_modulus import ps
+from lib.metrics.correlation import correlation_function_Cr
+from lib.metrics.vortex import vortex_density_torch
+from lib.metrics.magnetization import xy_magnetization_susceptibility
 from scipy.stats import wasserstein_distance
 
 import torch
@@ -24,14 +25,6 @@ from scipy.stats import wasserstein_distance
 
 import numpy as np
 
-def get_energy(L = 3, samples = None):
-    theta = torch.from_numpy(samples)
-    right = torch.roll(theta, shifts=-1, dims=-1)
-    down  = torch.roll(theta, shifts=-1, dims=-2)
-    energies =  -(torch.cos(theta - right) + torch.cos(theta - down))
-    energies = energies.sum(dim=(-2, -1))
-    energies = energies.cpu().numpy()
-    return samples, energies
 
 
 def percentage_overlap(real_samples, model_samples, bins = 80):

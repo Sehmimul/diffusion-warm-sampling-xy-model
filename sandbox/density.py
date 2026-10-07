@@ -1,7 +1,6 @@
 import torch
 from rich import print as pprint
 
-# --------- helper: Hutchinson divergence estimator ----------
 def hutchinson_divergence(f_fn, x, t, n_probes=1, probe='rademacher'):
     """
     Estimate div_x f(x,t) for a batch x using Hutchinson.
