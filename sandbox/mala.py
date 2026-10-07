@@ -60,7 +60,7 @@ def mala_xy(L=4, steps=10000, epsilon=0.01, beta=1.0, eq_cutoff = 200):
 
     return samples
 
-def get_energy(L = 3, beta = 15, steps=20000, eq_cutoff = 200, samples = None):
+def get_energy(L = 3, samples = None):
     theta = torch.from_numpy(samples)
     right = torch.roll(theta, shifts=-1, dims=-1)
     down  = torch.roll(theta, shifts=-1, dims=-2)
@@ -73,9 +73,7 @@ if __name__ == "__main__":
     beta = 1.02
     L = 10
     print("L: {} beta: {}".format(L,beta))
-    samples, energies = get_energy(L = L, beta = beta, steps = 200000, eq_cutoff = 10000)
     np.save('sandbox/assets/energies_beta_{}_L_{}.npy'.format(beta,L), energies)
-    # np.save('sandbox/assets/samples_beta_{}_L_{}.npy'.format(beta,L), samples)
 
     pprint("samples shape is {}".format(len(samples)))
     pprint("energies length is {}".format(len(energies)))

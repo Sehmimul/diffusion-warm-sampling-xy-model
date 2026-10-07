@@ -27,12 +27,11 @@ def sample(sde, model, L = 20, guidance_scale = None, beta = None, num_samples =
     warnings.warn("shape is hardcoded")
     x = sde.prior_sampling(shape).to(device)
     timesteps = torch.linspace(sde.T, eps, sde.N, device=device)
-    with torch.no_grad():
-
+  
+    with torch.inference_mode():
       for i in tqdm.tqdm(range(sde.N)):
           t = torch.ones(shape[0], device=device) * timesteps[i]
           x, x_mean = sampler.update_fn(x, t, guidance_scale, beta)
-          # x = (x + np.pi) % (2*np.pi) - np.pi
 
     num_samples = x_mean.size(0)
     rand_angles = 2 * torch.pi * torch.rand(num_samples, 1)   # shape: (num_samples, 1)
