@@ -3,7 +3,7 @@ import math, os
 import numpy as np
 from rich import print as pprint
 import matplotlib.pyplot as plt
-from sandbox.mala import get_energy, mala_xy
+from sandbox.mala import get_energy
 from sandbox.helicity_modulus import ps
 from sandbox.correlation import correlation_function_Cr
 from sandbox.vortex import vortex_density_torch
