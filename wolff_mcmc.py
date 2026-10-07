@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from lib.metrics.helicity_modulus import ps
 from lib.metrics.vortex import vortex_density_torch
 from lib.metrics.magnetization import xy_magnetization_susceptibility
-from lib.metrics.wolfe_correction import get_metrics
+from lib.wolff_correction import get_metrics
 from rich import print as pprint
 
 # ---------------------------
@@ -366,7 +366,6 @@ def MonteCarlo_XY_with_samples(
     energy_function,
     spin_stiffness_function,
     sample_every = 10,
-    burn_in_steps = 10000
 ):
     """
     Same as MonteCarlo_XY but also returns:
@@ -400,9 +399,9 @@ def MonteCarlo_XY_with_samples(
             warmup_samples.append(config.copy())
             
             
-            if step % sample_every == 0 and step > burn_in_steps:
-                metric_samples = np.array(warmup_samples).reshape((-1,Lx,Ly))[-2000:] # select the last 2000 samples for observable tracking
-                energies, E_mean, Cv, mean_ps, rho_v, C_r, magnetization, susceptibility = get_metrics(
+            if step % sample_every == 0:
+                metric_samples = np.array(warmup_samples).reshape((-1,Lx,Ly))
+                energies, E_mean, Cv, mean_ps, rho_v, C_r, magnetization, susceptibility, _, _ = get_metrics(
                     theta_cpu = metric_samples, 
                     L = Lx, 
                     beta = beta
@@ -453,24 +452,26 @@ def MonteCarlo_XY_with_samples(
             energy += deltaE
 
     samples = np.array(samples)
-    mean_ps, ps_x, ps_y = ps(samples = samples.reshape((-1,Lx,Ly)), beta = beta)
-    print("mean_ps is {}".format(mean_ps))
-    print("ps_x is {}".format(ps_x))
-    print("ps_y is {}".format(ps_y))
-    energies = np.array(energies)
-    helicity_modulus = mean_ps
-    return samples, energies, helicity_modulus
+    return samples
 
 
 
 if __name__ == "__main__":
+    # config
+    beta = 1
+    L = 20
+    steps = 100
+    warmup_steps = 10
+
     print("Generating samples for beta {} L {}|".format(beta,L))
 
-    samples, energies, helicity_modulus = MonteCarlo_XY_with_samples(
+
+
+    samples = MonteCarlo_XY_with_samples(
         beta=beta,
         Lx=L,
         Ly=L,
-        warmup_steps=5000,
+        warmup_steps=warmup_steps,
         steps=steps,
         build_lattice_function=build_lattice_df,
         rows_and_cols_function=rows_and_columns,
@@ -479,4 +480,7 @@ if __name__ == "__main__":
         spin_stiffness_function=spin_stiffness,
         sample_every=10,
     )
+
+    np.save("assets/data/wolff_samples_beta_{}_L_{}.npy".format(beta, L), np.array(samples))
+
 
