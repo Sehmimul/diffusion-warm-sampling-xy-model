@@ -3,12 +3,12 @@ import math, os
 import numpy as np
 from rich import print as pprint
 import matplotlib.pyplot as plt
-
 from sandbox.mala import get_energy, mala_xy
 from sandbox.helicity_modulus import ps
 from sandbox.correlation import correlation_function_Cr
 from sandbox.vortex import vortex_density_torch
 from sandbox.magnetization import xy_magnetization_susceptibility
+from scipy.stats import wasserstein_distance
 
 import torch
 import math
@@ -17,8 +17,78 @@ from joblib import Parallel, delayed
 
 import torch, wandb
 
+import time
 
-def get_metrics(theta_cpu, L, beta):
+# from sandbox.wasserstein import ensemble_circular_wasserstein
+import numpy as np
+from scipy.stats import wasserstein_distance
+
+import numpy as np
+
+def percentage_overlap(real_samples, model_samples, bins = 80):
+    """
+    Computes % overlap using histograms with range determined by min/max of both datasets.
+    """
+
+    # Determine shared range from BOTH datasets
+    data_min = min(np.min(real_samples), np.min(model_samples))
+    data_max = max(np.max(real_samples), np.max(model_samples))
+
+    # Compute histograms with SAME bin edges
+    real_hist, bin_edges = np.histogram(real_samples, bins=bins, range=(data_min, data_max))
+    model_hist, _ = np.histogram(model_samples, bins=bins, range=(data_min, data_max))
+
+    # Normalize to PMFs
+    real_pmf = real_hist / np.sum(real_hist)
+    model_pmf = model_hist / np.sum(model_hist)
+
+    # Compute overlap
+    overlap = np.sum(np.minimum(real_pmf, model_pmf))
+
+    return overlap
+
+def compute_emd_from_histograms(real_samples, model_samples, num_bins=80):
+    """
+    Computes EMD (Wasserstein-1) between two empirical distributions
+    using histogram-based PMFs.
+    
+    Args:
+        real_samples: array-like, ground truth samples
+        model_samples: array-like, generated samples
+        num_bins: int, number of histogram bins
+        
+    Returns:
+        emd: float
+    """
+    
+    # 1. Define common bin edges (VERY IMPORTANT)
+    min_val = min(real_samples.min(), model_samples.min())
+    max_val = max(real_samples.max(), model_samples.max())
+    
+    bin_edges = np.linspace(min_val, max_val, num_bins + 1)
+    
+    # 2. Compute histograms
+    real_hist, _ = np.histogram(real_samples, bins=bin_edges, density=False)
+    model_hist, _ = np.histogram(model_samples, bins=bin_edges, density=False)
+    
+    # 3. Convert to PMFs
+    real_pmf = real_hist / real_hist.sum()
+    model_pmf = model_hist / model_hist.sum()
+    
+    # 4. Compute bin centers (locations of probability mass)
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    
+    # 5. Compute EMD (weighted version!)
+    emd = wasserstein_distance(
+        u_values=bin_centers,
+        v_values=bin_centers,
+        u_weights=real_pmf,
+        v_weights=model_pmf
+    )
+    
+    return emd
+
+def get_metrics(theta_cpu, L, beta, reference_samples = None):
     # mean energy and C_v
     _, energies = get_energy(samples = theta_cpu, L = L)
 
@@ -40,10 +110,45 @@ def get_metrics(theta_cpu, L, beta):
 
     # magnetization and susceptibility
     magnetization, susceptibility = xy_magnetization_susceptibility(theta = theta_cpu, beta = beta)
+    mean_magnetization = magnetization.mean()
 
-    return energies_np, E_mean, Cv, mean_ps, rho_v, C_r, magnetization, susceptibility
+    if reference_samples is not None:
+        print(theta_cpu.shape)
+        print(reference_samples.shape)
+        _, reference_energies = get_energy(samples = reference_samples, L = L)
+        reference_magnetization, _ = xy_magnetization_susceptibility(theta = reference_samples, beta = beta)
+        print(magnetization.shape)
+        print(reference_magnetization.shape)
+        energy_emd = wasserstein_distance(energies / (L*L), reference_energies / (L*L))
+        magnetization_emd = wasserstein_distance(magnetization, reference_magnetization)
+    else:
+        energy_emd = 0
+        magnetization_emd = 0
 
-# --- XY energy (optional, for debugging) ---
+    return energies_np, E_mean, Cv, mean_ps, rho_v, C_r, mean_magnetization, susceptibility, energy_emd, magnetization_emd
+
+
+def get_eps(result_first, result_second):
+    if len(result_first) != len(result_second):
+        raise ValueError("Result tuples must have the same length")
+
+    mse_list = []
+
+    for a, b in zip(result_first, result_second):
+        a = np.asarray(a)
+        b = np.asarray(b)
+
+        if a.shape != b.shape:
+            a = np.mean(a)
+            b = np.mean(b)
+
+        mse = np.mean((a - b) ** 2)
+        mse_list.append(mse)
+
+
+    return mse_list
+
+
 def xy_energy_torch(theta):
     # theta: (L,L) or (B,L,L) but used per-sample below
     right = torch.roll(theta, shifts=-1, dims=-1)
@@ -106,7 +211,6 @@ def wolff_xy_update_single(theta, beta):
                 in_cluster[ni, nj] = True
                 stack.append((ni, nj))
 
-    # reflect spins in cluster: s' = s - 2 (s·r) r = s - 2 p r
     sx_new = sx.clone()
     sy_new = sy.clone()
     pc = p[in_cluster]
@@ -117,10 +221,8 @@ def wolff_xy_update_single(theta, beta):
     return theta_new, int(in_cluster.sum().item())
 
 @torch.no_grad()
-def wolff_cluster_correct_xy(theta0, beta, n_steps=200, device=None, show_progress=True, project = None, diffusion_results = None, mala_results = None):
+def wolff_cluster_correct_xy(theta0, beta, n_steps=200, device=None, show_progress=True, project = None, diffusion_results = None, mala_results = None, run = None):
     """
-    Replace your mala_local_correct_xy with Wolff cluster correction.
-
     theta0:
       - numpy array (B,L,L) or (L,L)
       - or torch tensor (B,L,L) or (L,L)
@@ -129,7 +231,8 @@ def wolff_cluster_correct_xy(theta0, beta, n_steps=200, device=None, show_progre
       - avg_cluster_size: float
       - cluster_sizes: list[int]
     """
-    # convert input to torch (batch-first)
+    if run == None:
+        raise ValueError("Wandb run not initialized")
     if isinstance(theta0, np.ndarray):
         theta = torch.from_numpy(theta0)
     elif torch.is_tensor(theta0):
@@ -152,202 +255,78 @@ def wolff_cluster_correct_xy(theta0, beta, n_steps=200, device=None, show_progre
         iterator = tqdm.tqdm(iterator, desc="Wolff updates")
     C_r_prev = []
     mse_list = []
-    # energies_diff, E_mean_diff, Cv_diff, mean_ps_diff, rho_v_diff, C_r_diff, magnetization_diff, susceptibility_diff = diffusion_results
-    # energies_mala, E_mean_mala, Cv_mala, mean_ps_mala, rho_v_mala, C_r_mala, magnetization_mala, susceptibility_mala = mala_results
 
     print("Staring Wolff")
-    # with wandb.init(project=project) as run:
-    for step in iterator:
-        # apply one Wolff update per batch element
-        # for b in tqdm.tqdm(range(B)):
-        #     theta_b, sz = wolff_xy_update_single(theta[b], beta)
-        #     theta[b] = theta_b
-        #     cluster_sizes.append(sz)
+    project = "wolff benchmarking"
+    theta_list = []
+    reference_samples = None
+    img = False
+    previous_configuration = None
+    cluster_size = 0
+    wolff_total_time = 0
 
+    beta_key = f"beta={beta:.3f}"   # fixed format so keys are stable
+
+    run.define_metric(f"{beta_key}/wolff_steps")
+    run.define_metric(f"{beta_key}/*", step_metric=f"{beta_key}/wolff_steps")
+
+    for step in iterator:
+        theta_cpu = theta.detach().cpu().numpy()       
+        theta_list.append(theta_cpu)
+
+        correction_results = get_metrics(theta_cpu = theta_cpu, L = L, beta = beta)
+        expected_energy = correction_results[1]
+        heat_capacity = correction_results[2]
+        helicity_modulus = correction_results[3]
+        vortex_density = correction_results[4]
+        correlation_list = correction_results[5]
+        magnetization = correction_results[6]
+        susceptibility = correction_results[7]
+        energy_emd = correction_results[8]
+        magnetization_emd = correction_results[9]
+
+        run.log({
+            f"{beta_key}/MCMC Energy": expected_energy,
+            f"{beta_key}/MCMC Energy per spin": expected_energy / (L*L),
+            f"{beta_key}/magnetization": magnetization,
+            f"{beta_key}/helicity modulus": helicity_modulus,
+            f"{beta_key}/heat capacity": heat_capacity,
+            f"{beta_key}/vortex density": vortex_density,
+            f"{beta_key}/susceptibility": susceptibility,
+            f"{beta_key}/wolff_steps": step,
+            f"{beta_key}/L": L,
+            f"{beta_key}/beta": beta,
+            f"{beta_key}/wolff time": wolff_total_time,
+            f"{beta_key}/energy emd": energy_emd,
+            f"{beta_key}/magnetization emd": magnetization_emd,
+            f"{beta_key}/cluster size": cluster_size,
+        })
+        if step == 0:
+            print("initial correlations is {}".format(correlation_list.tolist()))
+
+        previous_configuration = theta_cpu.copy()
+
+        wolff_step_start = time.time()
         results = Parallel(n_jobs=-1, prefer="processes")(
             delayed(wolff_xy_update_single)(theta[b].clone(), beta)
             for b in tqdm.tqdm(range(B))
         )
+        wolff_step_end = time.time()
+        wolff_step_time = wolff_step_end - wolff_step_start
+        wolff_total_time = wolff_total_time + wolff_step_time
 
         for b, (theta_b, sz) in enumerate(results):
             theta[b].copy_(theta_b)   # in-place torch update
             cluster_sizes.append(sz)
 
         theta_cpu = theta.detach().cpu().numpy()
-        """
+        theta_list.append(theta_cpu) ## error is here
+        cluster_size = np.mean(cluster_sizes)
+
+        print("theta cpu is {}".format(theta_cpu.shape))
+
         if step % 10 == 0:
-            energies, E_mean, Cv, mean_ps, rho_v, C_r, magnetization, susceptibility = get_metrics(theta_cpu = theta_cpu, L = L, beta = beta)
-
-            run.log({
-                "Expected Energy/corrected": E_mean,
-                "Expected Energy/diffusion": E_mean_diff,
-                "Expected Energy/mala": E_mean_mala,
-                "Heat Capacity/corrected": Cv, 
-                "Heat Capacity/diffusion": Cv_diff,
-                "Heat Capacity/mala": Cv_mala,
-                "Helicity Modulus/corrected": mean_ps,
-                "Helicity Modulus/diffusion": mean_ps_diff,
-                "Helicity Modulus/mala": mean_ps_mala,                
-                "Vortex Density/corrected": rho_v,
-                "Vortex Density/diffusion": rho_v_diff,
-                "Vortex Density/mala": rho_v_mala,
-                "magnetization/corrected": magnetization,
-                "magnetization/diffusion": magnetization_diff,
-                "magnetization/mala": magnetization_mala,
-                "susceptibility/corrected": susceptibility,
-                "susceptibility/diffusion": susceptibility_diff,
-                "susceptibility/mala": susceptibility_mala,
-                "beta": beta,
-                "L": L
-            })
-
-
-            # C(r) plot
-            R = len(C_r_mala)
-            assert len(C_r_diff) == R
-            assert len(C_r) == R
-
-            r = np.arange(R)
-
-            fig, ax = plt.subplots(figsize=(6, 4))
-            colors = {
-                "mala": "#0072B2",       # blue
-                "corrected": "#D55E00",  # vermillion
-                "diffusion": "#009E73",  # green
-            }
-
-            ax.plot(r, C_r_mala, label="MALA", linewidth=1, alpha = 0.5, marker = 's', linestyle = '--', color=colors["mala"])
-            ax.plot(r, C_r, label="Corrected", linewidth=1, alpha = 0.5, marker="x", linestyle = '-', color=colors["corrected"])
-            ax.plot(r, C_r_diff, label="Diffusion", linewidth=1, alpha = 0.5, marker = "o", linestyle = '--', color=colors["diffusion"])
-
-            ax.set_xlabel("r")
-            ax.set_ylabel("C(r)")
-            ax.set_title(f"C(r) vs r (step = {step})")
-            ax.legend()
-            ax.grid(True)
-
-            wandb.log({
-                "C_r_plot": wandb.Image(fig),
-            })
-
-            plt.close(fig)
-
-            # C(r) log plot
-            R = len(C_r_mala)
-            assert len(C_r_diff) == R
-            assert len(C_r) == R
-
-            r = np.arange(R)
-
-            fig, ax = plt.subplots(figsize=(6, 4))
-            colors = {
-                "mala": "#0072B2",       # blue
-                "corrected": "#D55E00",  # vermillion
-                "diffusion": "#009E73",  # green
-            }
-
-            ax.plot(r, C_r_mala, label="MALA", linewidth=1, alpha = 0.5, marker = 's', linestyle = '--', color=colors["mala"])
-            ax.plot(r, C_r, label="Corrected", linewidth=1, alpha = 0.5, marker="x", linestyle = '-', color=colors["corrected"])
-            ax.plot(r, C_r_diff, label="Diffusion", linewidth=1, alpha = 0.5, marker = "o", linestyle = '--', color=colors["diffusion"])
-            ax.set_yscale('log')
-            ax.set_xlabel("r")
-            ax.set_ylabel("C(r)")
-            ax.set_title(f"C(r) vs r [log plot] (step = {step})")
-            ax.legend()
-            ax.grid(True)
-
-            wandb.log({
-                "C_r_log_plot": wandb.Image(fig),
-            })
-
-            plt.close(fig)
-
-
-            # plot energy diagram
-            # plot histograms
-            fig, ax = plt.subplots(figsize=(6, 4))
-
-
-            ax.hist(
-                energies_mala,
-                bins=50,
-                density=True,
-                histtype="step",
-                linewidth=2,
-                label="MALA",
-                alpha = 0.5
-            )
-            ax.hist(
-                energies,
-                bins=50,
-                density=True,
-                histtype="step",
-                linewidth=2,
-                label="Corrected",
-                alpha = 0.5
-            )
-            ax.hist(
-                energies_diff,
-                bins=50,
-                density=True,
-                histtype="step",
-                linewidth=1,
-                label="Diffusion",
-                alpha = 0.5
-            )
-            ax.set_xlabel("Energy")
-            ax.set_ylabel("Density")
-            ax.set_title(f"Energy distribution (step = {step})")
-            ax.grid(alpha=0.3)
-            ax.legend()
-
-            wandb.log({
-                "Energy plot": wandb.Image(fig),
-            })
-            plt.close(fig)     
-
-        """
+            print("step {} correlations is {}".format(step, correlation_list.tolist()))
     avg_cluster_size = float(np.mean(cluster_sizes)) if len(cluster_sizes) else 0.0
     return theta, avg_cluster_size, cluster_sizes, mse_list
 
-
-if __name__ == "__main__":
-    from rich import print as pprint
-
-    project =  "inference-correction"
-
-    wandb.init(project=project)
-
-    beta = 1.3
-    L = 40
-
-    diffusion_out = np.load('sandbox/assets/diffusion_samples_beta_{}_L_{}_g1.8_allT.npy'.format(beta, L))
-
-    pprint("L: {}; beta: {}".format(L, beta))
-
-    diffusion_out = diffusion_out.reshape((diffusion_out.shape[0], L,L))
-
-    diffusion_results = get_metrics(theta_cpu = diffusion_out, L = L, beta = beta)
-
-    # diffusion_results = [E_mean_diff, Cv_diff, mean_ps_diff, rho_v_diff]
-
-    mala_out = np.load('sandbox/assets/wolfe_samples_beta_{}_L_{}.npy'.format(beta, L))
-    
-    mala_out = mala_out.reshape((mala_out.shape[0], L,L))
-
-    mala_results = get_metrics(theta_cpu = mala_out, L = L, beta = beta)
-
-    # mala_results = [E_mean_mala, Cv_mala, mean_ps_mala, rho_v_mala]
-    ###########
-    # B, L, _ = diffusion_out.shape
-
-    # diffusion_out = np.random.uniform(
-    #     low=0.0,
-    #     high=2.0 * np.pi,
-    #     size=(B, L, L)
-    # )
-    # in 10 steps I could correct more or less for [beta = 1, 32] but in 10 steps I cannot generate mcmc samples using the wolfe!
-    ###########
-    theta_corr, avg_sz, sizes, mse_list = wolff_cluster_correct_xy(diffusion_out, beta = beta, n_steps=100, project = project, diffusion_results = diffusion_results, mala_results = mala_results)
-    print("MALA acceptance:", avg_sz)
-    pprint("Mse list: {}".format(mse_list))
