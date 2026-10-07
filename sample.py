@@ -9,7 +9,7 @@ import time
 
 from lib.sampling import sample
 from lib.sde_lib import VESDE
-from lib.model import Model, ScoreNetAngles, ScoreNetAngles1, CorrectionNetwork
+from lib.model import RotInvScoreNet
 from lib.sampling import sample
 
 from config import ModelConfig, XYDataConfig
@@ -49,7 +49,7 @@ def same_every_beta(
     sde = VESDE(sigma_min = model_config.sigma_min, sigma_max = model_config.sigma_max, N = model_config.N)
 
     # initialize the model
-    model = ScoreNetAngles1().to(device)
+    model = RotInvScoreNet().to(device)
 
     # get beta_list and L
     L = sampling_config.L

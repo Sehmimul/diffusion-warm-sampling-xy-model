@@ -9,7 +9,7 @@ import random
 from rich import print as pprint
 
 from lib.sde_lib import VESDE
-from lib.model import Model, ScoreNetAngles, ScoreNetAngles1
+from lib.model import Model, ScoreNetAngles, RotInvScoreNet
 from lib.sampling import sample
 from config import ModelConfig, GaussianDataConfig, GaussianMixtureDataConfig, XYDataConfig
 from train import train_step
@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     sde = VESDE(sigma_min = config.sigma_min, sigma_max = config.sigma_max, N = config.N)
 
-    model = ScoreNetAngles1().to(device)
+    model = RotInvScoreNet().to(device)
     optim = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
 
 

@@ -11,9 +11,6 @@ from lib.metrics.magnetization import xy_magnetization_susceptibility
 from lib.wolff_correction import get_metrics
 from rich import print as pprint
 
-# ---------------------------
-# Lattice + geometry helpers
-# ---------------------------
 
 def build_lattice_df(Lx, Ly):
     """

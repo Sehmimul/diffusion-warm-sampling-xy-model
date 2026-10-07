@@ -166,9 +166,7 @@ if __name__ == "__main__":
   z = z.cpu().numpy()
 
   plt.hist(values, bins=bin_edges, alpha = 0.5, density = True, label = "samples")
-  # plt.hist(values, bins=bin_edges, weights=probs, density=True, alpha=0.7, label = "probabilities")
-  # plt.hist(z, bins=bin_edges, histtype="step", edgecolor="black", linewidth=0.5, label = "exact", density = True)
-  ############
+
   from scipy.stats import norm
   mu1, sigma1, w1 = -10, 1.0, 0.15
   mu2, sigma2, w2 = 7, 1.0, 0.85
@@ -202,29 +200,6 @@ if __name__ == "__main__":
   wandb.log({"prob_distribution": wandb.Image(plt)})
   plt.close()
 
-
-
-  # Example data
-  # probs = [1/100]      # replace with your probs
-
-  # init wandb
-
-
-  # # --- Bar plot ---
-  # fig = go.Figure(data=[
-  #     go.Bar(x=values, y=probs, marker_color="royalblue")
-  # ])
-  # fig.update_layout(
-  #     title="Probability Distribution",
-  #     xaxis_title="Values",
-  #     yaxis_title="Probability",
-  # )
-
-  # # Log properly
-  # wandb.log({"prob_distribution": wandb.Plotly(fig)})
-
-  # --- CDF plot ---
-  # cdf = np.cumsum(probs)
   fig2 = go.Figure(data=[
       go.Scatter(x=values, y=probs, mode="markers", line=dict(color="green"))
   ])

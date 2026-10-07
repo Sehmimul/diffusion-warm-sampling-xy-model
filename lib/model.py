@@ -220,34 +220,10 @@ class PeriodicConv2d(nn.Module):
         # Apply periodic (circular) padding in both spatial dimensions
         x = F.pad(x, (self.pad, self.pad, self.pad, self.pad), mode='circular')
         return self.conv(x)
-# class ScoreNetAngles1(nn.Module):
-#     def __init__(self, lattice_size=4, base_channels=16, time_emb_dim=64, out_mode="theta"):
-        
-#         #out_mode: 'theta' -> outputs dlogp/dtheta of shape (B, L*L)
-#         #'cartesian' -> outputs dlogp/d(cos,sin) of shape (B, 2*L*L)
-        
-#         super().__init__()
-#         self.out_mode = out_mode
-#         self.time_embed = TimeEmbedding(time_emb_dim)
 
-#         # self.conv_in = nn.Conv2d(2, base_channels, 3, padding=1)
-#         self.conv_in = PeriodicConv2d(2, base_channels, 3, padding=1) #3, padding=1
 
-#         self.res1 = ResidualBlock(base_channels, base_channels, time_emb_dim) ## removed
-#         self.res2 = ResidualBlock(base_channels, base_channels*2, time_emb_dim)
-#         self.res3 = ResidualBlock(base_channels*2, base_channels*2, time_emb_dim) ## removed
-
-#         # self.conv_out = nn.Conv2d(base_channels*2, 2 if out_mode == "cartesian" else 1, 3, padding=1)
-#         self.conv_out = PeriodicConv2d(base_channels*2, 2 if out_mode == "cartesian" else 1, 3, padding=1) #3, padding=1
-
-# 5 filters and more base channels (16 -> 32)
-class ScoreNetAngles1(nn.Module):
-    def __init__(self, lattice_size=4, base_channels=32, time_emb_dim=64, out_mode="theta"): # this was the 'strong' network
-    # def __init__(self, lattice_size=4, base_channels=64, time_emb_dim=64, out_mode="theta"):
-
-        
-        #out_mode: 'theta' -> outputs dlogp/dtheta of shape (B, L*L)
-        #'cartesian' -> outputs dlogp/d(cos,sin) of shape (B, 2*L*L)
+class RotInvScoreNet(nn.Module):
+    def __init__(self, lattice_size=4, base_channels=32, time_emb_dim=64, out_mode="theta"):
         
         super().__init__()
         self.out_mode = out_mode
@@ -283,6 +259,7 @@ class ScoreNetAngles1(nn.Module):
             cond = self.cond_proj(torch.cat([t_emb, beta_emb], dim=-1))
 
         h = self.conv_in(x)
+        # print("dim cond is {}".format(cond.size()))
         h = self.res1(h, cond)
         h = self.res2(h, cond)
         h = self.res3(h, cond)
@@ -291,11 +268,6 @@ class ScoreNetAngles1(nn.Module):
         h = h.view(h.size(0), -1)
         return h
 
-
-
-import math
-import torch
-import torch.nn as nn
 
 
 class SinusoidalEmbedding(nn.Module):

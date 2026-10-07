@@ -3,16 +3,15 @@ import torch
 
 class ModelConfig(BaseModel):
 
-    # training (common)
     learning_rate: float =  0.0001
     batch_size: int = 500
     num_epochs: int = 60000
-    display_epoch: int = 5
+    display_epoch: int = 1
     optimizer: str = "adam"
     project_name: str = "diffusion-xy-1"
     sigma_min: float = 0.01
     sigma_max: float = 50
-    N: int = 500
+    N: int = 2
     eps: float = 1e-5
     train_split: float = 0.7
     val_split: float = 0.27
@@ -25,7 +24,7 @@ class SamplingConfig(BaseModel):
     trained_size: int = 20
     L: int = 60
 
-    beta_list: list = [0.5, 0.6, 0.7, 0.8, 1, 1.2, 1.3, 1.4, 1.5, 1.6]
+    beta_list: list = [0.5,0.6, 1.4] #[0.5, 0.6, 0.7, 0.8, 1, 1.2, 1.3, 1.4, 1.5, 1.6]
 
     num_samples: int = 1000
 
@@ -41,7 +40,7 @@ class SamplingConfig(BaseModel):
 
     # Wolff correction
     wolff_correction: bool = True
-    wolff_correction_steps: int = 15000
+    wolff_correction_steps: int = 10
     wolff_correction_save_betas: list = [0.5, 1, 1.5]
     train_split: float = 0.7
     val_split: float = 0.27
