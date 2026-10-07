@@ -1,7 +1,16 @@
 import numpy as np
 import pandas as pd
 import tqdm
-from helicity_modulus import ps
+import wandb
+import torch
+import time
+import matplotlib.pyplot as plt
+from lib.metrics.helicity_modulus import ps
+from lib.metrics.vortex import vortex_density_torch
+from lib.metrics.magnetization import xy_magnetization_susceptibility
+from lib.metrics.wolfe_correction import get_metrics
+from rich import print as pprint
+
 # ---------------------------
 # Lattice + geometry helpers
 # ---------------------------
@@ -222,11 +231,6 @@ def XY_cluster_update(config, energy, interactions, beta, energy_func):
 
     return config, deltaE, delta_accept_count
 
-
-# ---------------------------
-# Spin stiffness
-# ---------------------------
-from rich import print as pprint
 def spin_stiffness(beta, config, interactions, rows, cols):
     """
     Python translation of Julia spin_stiffness(beta, config, interactions, rows, cols).
@@ -350,39 +354,6 @@ def MonteCarlo_XY(
     return maindf, configs
 
 
-# # ---------------------------
-# # Example call (translated from Julia)
-# # ---------------------------
-
-# if __name__ == "__main__":
-#     maindf, configs = MonteCarlo_XY(
-#         beta=100.0,
-#         Lx=4,
-#         Ly=4,
-#         warmup_steps=500,
-#         steps=1000,
-#         build_lattice_function=build_lattice_df,
-#         rows_and_cols_function=rows_and_columns,
-#         update_function=XY_cluster_update,  # or XY_update
-#         energy_function=Calculate_XY_Energy,
-#         spin_stiffness_function=spin_stiffness,
-#     )
-
-#     print(maindf.head())
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-
-# ---------------------------------------------------------
-# (YOUR ORIGINAL CODE: lattice, energy, cluster update ...)
-# ---------------------------------------------------------
-# I'm not repeating them here — keep your previous full translation above.
-# Assume they are already defined:
-#   build_lattice_df, rows_and_columns, Calculate_XY_Energy,
-#   XY_cluster_update, spin_stiffness, etc.
-# ---------------------------------------------------------
-
-
 def MonteCarlo_XY_with_samples(
     beta,
     Lx,
@@ -394,7 +365,8 @@ def MonteCarlo_XY_with_samples(
     update_function,
     energy_function,
     spin_stiffness_function,
-    sample_every=10,         # save every 10th configuration
+    sample_every = 10,
+    burn_in_steps = 10000
 ):
     """
     Same as MonteCarlo_XY but also returns:
@@ -410,37 +382,75 @@ def MonteCarlo_XY_with_samples(
     energy = energy_function(config, interactions)
 
     samples = []
+    warmup_samples = []
     energies = []
     helicity_modulus = []
 
-    # Warmup
-    for step in tqdm.tqdm(range(1, warmup_steps + 1)):
-        config, deltaE, _ = update_function(
-            config, energy, interactions, beta, energy_function
-        )
-        energy += deltaE
+    project_name = "mcmc"
+    with wandb.init(project = project_name) as run:
+        # Warmup
+        warmup_time = 0
+        for step in tqdm.tqdm(range(1, warmup_steps + 1)):
+            warmup_time_begin = time.time()
+            config, deltaE, _ = update_function(
+                config, energy, interactions, beta, energy_function
+            )
+            warmup_time_end = time.time()
+            warmup_time = warmup_time_end - warmup_time_begin + warmup_time
+            warmup_samples.append(config.copy())
+            
+            
+            if step % sample_every == 0 and step > burn_in_steps:
+                metric_samples = np.array(warmup_samples).reshape((-1,Lx,Ly))[-2000:] # select the last 2000 samples for observable tracking
+                energies, E_mean, Cv, mean_ps, rho_v, C_r, magnetization, susceptibility = get_metrics(
+                    theta_cpu = metric_samples, 
+                    L = Lx, 
+                    beta = beta
+                )
+                run.log({
+                    "MCMC Energy": E_mean, 
+                    "MCMC Energy per spin": E_mean / (Lx * Ly),
+                    "heat capacity": Cv, 
+                    "helicity modulus": mean_ps,
+                    "magnetization": magnetization,
+                    "susceptibility": susceptibility,
+                    "vortex density": rho_v,
+                    "wolff_steps": step, 
+                    "L": L, 
+                    "beta": beta
+                })
+            energy += deltaE
 
-    # Main MC loop
-    for step in tqdm.tqdm(range(1, steps + 1)):
-        config, deltaE, _ = update_function(
-            config, energy, interactions, beta, energy_function
-        )
-        energy += deltaE
-
-
-        # if step % sample_every == 0:
-        #     # ps, _, _ = spin_stiffness_function(beta, config, interactions, rows, cols)
-        #     ps_config = config.reshape((1, Lx, Ly))
-        #     # print(ps_config.shape)
-        #     mean_ps, ps_x, ps_y = ps(samples = ps_config, beta = beta)
-        #     helicity_modulus.append(mean_ps)
-        #     print("mean_ps is {}".format(mean_ps))
-        #     print("ps_x is {}".format(ps_x))
-        #     print("ps_y is {}".format(ps_y))
-        # Save samples
-        if step % sample_every == 0:
-            samples.append(config.copy())
-            energies.append(energy)
+        # Main MC loop
+        print("warm up time is {}".format(warmup_time))
+        main_time = warmup_time
+        for step in tqdm.tqdm(range(1, steps + 1)):
+            main_time_begin = time.time()
+            config, deltaE, _ = update_function(
+                config, energy, interactions, beta, energy_function
+            )
+            main_time_end = time.time()
+            main_time = main_time_end - main_time_begin + main_time
+            if step < 10 or step % 10000000 == 0:
+                if step % sample_every == 0:
+                    samples.append(config.copy())
+                    energies.append(energy)
+                magnetization, susceptibility = xy_magnetization_susceptibility(theta = config.reshape((1, Lx, Ly)), beta = beta)
+                rho_v, w, rho_v_batch = vortex_density_torch(theta = torch.from_numpy(config.reshape((1, Lx, Ly))))
+                mean_ps, ps_x, ps_y = ps(samples = np.array(samples).reshape((-1,Lx,Ly)), beta = beta)
+            run.log({
+                "MCMC Energy": energy, 
+                "MCMC Energy per spin": energy / (Lx * Ly),
+                "helicity modulus": mean_ps,
+                "magnetization": magnetization,
+                "Susceptibility": susceptibility,
+                "vortex density": rho_v,
+                "wolff_steps": step, 
+                "L": L, 
+                "beta": beta,
+                "time": main_time
+            })
+            energy += deltaE
 
     samples = np.array(samples)
     mean_ps, ps_x, ps_y = ps(samples = samples.reshape((-1,Lx,Ly)), beta = beta)
@@ -452,46 +462,21 @@ def MonteCarlo_XY_with_samples(
     return samples, energies, helicity_modulus
 
 
-# ---------------------------------------
-# Run simulation + save + plot histogram
-# ---------------------------------------
 
-beta = 1.25
-L  = 40
+if __name__ == "__main__":
+    print("Generating samples for beta {} L {}|".format(beta,L))
 
+    samples, energies, helicity_modulus = MonteCarlo_XY_with_samples(
+        beta=beta,
+        Lx=L,
+        Ly=L,
+        warmup_steps=5000,
+        steps=steps,
+        build_lattice_function=build_lattice_df,
+        rows_and_cols_function=rows_and_columns,
+        update_function=XY_cluster_update,
+        energy_function=Calculate_XY_Energy,
+        spin_stiffness_function=spin_stiffness,
+        sample_every=10,
+    )
 
-steps= 100000
-
-print("Generating samples for betasiu {} L {}|".format(beta,L))
-
-samples, energies, helicity_modulus = MonteCarlo_XY_with_samples(
-    beta=beta,
-    Lx=L,
-    Ly=L,
-    warmup_steps=5000,
-    steps=steps,
-    build_lattice_function=build_lattice_df,
-    rows_and_cols_function=rows_and_columns,
-    update_function=XY_cluster_update,
-    energy_function=Calculate_XY_Energy,
-    spin_stiffness_function=spin_stiffness,
-    sample_every=5,
-)
-
-# Save samples
-
-np.save("sandbox/assets/wolfe_samples_beta_{}_L_{}.npy".format(beta,L), samples)
-np.save("sandbox/assets/wolfe_energies_beta_{}_L_{}.npy".format(beta,L), energies)
-print("Saved samples.npy and energies.npy for beta {} L {}|".format(beta,L))
-print("helicity modulus is {}".format(helicity_modulus))
-# ---------------------------------------
-# Plot energy distribution
-# ---------------------------------------
-
-plt.figure(figsize=(6, 4))
-plt.hist(energies, bins=40, density=True, alpha = 0.5)
-plt.xlabel("Energy")
-plt.ylabel("Probability Density")
-plt.title("Energy Distribution of XY Model Samples")
-plt.grid(True, alpha=0.2)
-plt.savefig('sandbox/assets/mala_wolfe_distribution.png')
