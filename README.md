@@ -1,7 +1,10 @@
 # Diffusion-warm sampling of the XY model enables fast thermalization at scale
+
+Implementation of [Diffusion-warm sampling of the XY model enables fast thermalization at scale](https://arxiv.org/abs/2606.30773) (NeurIPS 2026 main track poster) by Sehmimul Hoque, Roger Melko and Pooya Ronagh.
+
 ![Method diagram](assets/method_diagram.png)
 
-A research codebase for score-based diffusion models trained on equilibrium configurations of the 2D XY model. The trained model generates warm-start configurations for Markov chain Monte Carlo (MCMC), and we demonstrate that this reduces thermalization time by roughly an order of magnitude relative to uninformed initialization. The model is trained on small lattices and applied to larger ones (train small, infer large).
+We introduce a novel technique for scalable sampling of spin-system states with continuous symmetries using diffusion models. By applying our approach to the XY model, a fundamental continuous-spin model in condensed matter physics, we show that our technique addresses the shortfalls of the Markov chain Monte Carlo (MCMC) in generalization to varying system sizes. More specifically, we show that training a temperature-conditioned diffusion model on smaller-size XY model lattices enables the generation of accurate samples in larger lattice sizes. By tracking physically important observables of the model, such as spin correlations, our experiments demonstrate that diffusion sampling followed by a few MCMC steps reduces the thermalization time by an order of magnitude relative to the standard MCMC with random initialization. Our study provides valuable insight as to how generative models can be used to study continuous-state condensed matter systems at scale.
 
 ## How it works
 
@@ -28,6 +31,8 @@ To generate samples using a trained model, please run the following command and 
 ```bash
 python3 sample.py
 ```
+
+Please feel free to create issues or reach out by [email](mailto:s4hoque@uwaterloo.ca) for any questions.
 
 ## Project contents
 
