@@ -11,11 +11,10 @@ from lib.metrics.magnetization import xy_magnetization_susceptibility
 from lib.wolff_correction import get_metrics
 from rich import print as pprint
 
+# The code is based on the Julia implementation of the Wolff algorithm for the XY model which can be found at https://github.com/mschuylermoss/705Project/tree/main.
 
 def build_lattice_df(Lx, Ly):
     """
-    Python translation of Julia build_lattice_df(Lx, Ly).
-
     interactions is a pandas DataFrame where each column is named like "site,x" or "site,y",
     and each cell at row (site-1) holds a Python list of neighbor indices (1-based).
     """
@@ -46,8 +45,6 @@ def build_lattice_df(Lx, Ly):
 
 def rows_and_columns(Lx, Ly):
     """
-    Python translation of Julia rows_and_columns(Lx, Ly).
-
     Returns:
       rows: DataFrame with columns 'row1', 'row2', ..., each a Series of site indices.
       cols: DataFrame with columns 'col1', 'col2', ..., each a Series of site indices.
@@ -76,8 +73,6 @@ def rows_and_columns(Lx, Ly):
 
 def Calculate_XY_Energy(config, interactions):
     """
-    Python translation of Julia Calculate_XY_Energy(config, interactions).
-
     config: 1D numpy array of angles (length N)
     interactions: DataFrame from build_lattice_df
     """
@@ -101,8 +96,6 @@ def Calculate_XY_Energy(config, interactions):
 
 def XY_update(config, energy, interactions, beta, energy_func):
     """
-    Python translation of Julia XY_update(config, energy, interactions, beta, energy_func).
-
     Single-site global random update (actually global random re-draw in original code).
     """
     # propose random angles
@@ -131,8 +124,6 @@ def XY_update(config, energy, interactions, beta, energy_func):
 
 def Wolff_step(L, neighbours, spins_angles, T):
     """
-    Python translation of Julia Wolff_step(L::Int, neighbours, spins_angles, T).
-
     neighbours: 2D array-like where neighbours[spin-1, :] gives neighbor indices (1-based).
     spins_angles: 1D numpy array of angles, length L^2.
     """
@@ -177,8 +168,6 @@ def Wolff_step(L, neighbours, spins_angles, T):
 
 def XY_cluster_update(config, energy, interactions, beta, energy_func):
     """
-    Python translation of Julia XY_cluster_update(config, energy, interactions, beta, energy_func).
-
     Uses the interactions DataFrame from build_lattice_df.
     """
     N = len(config)
@@ -230,8 +219,6 @@ def XY_cluster_update(config, energy, interactions, beta, energy_func):
 
 def spin_stiffness(beta, config, interactions, rows, cols):
     """
-    Python translation of Julia spin_stiffness(beta, config, interactions, rows, cols).
-
     rows, cols are DataFrames from rows_and_columns.
     """
     N = len(config)
@@ -293,9 +280,7 @@ def MonteCarlo_XY(
     energy_function,
     spin_stiffness_function,
 ):
-    """
-    Python translation of Julia MonteCarlo_XY(...).
-    """
+
     # system information
     N = Lx * Ly
     interactions = build_lattice_function(Lx, Ly)
@@ -457,8 +442,8 @@ if __name__ == "__main__":
     # config
     beta = 1
     L = 20
-    steps = 100
-    warmup_steps = 10
+    steps = 1000
+    warmup_steps = 100
 
     print("Generating samples for beta {} L {}|".format(beta,L))
 
