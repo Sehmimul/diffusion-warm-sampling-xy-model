@@ -10,8 +10,6 @@ We introduce a novel technique for scalable sampling of spin-system states with 
 
 A forward process gradually adds noise to equilibrium spin configurations, whose angles live on the torus. A neural network learns to estimate the score of the resulting noisy distributions at each noise level. Temperature is also used as a conditional variable to avoid training different models at different temperature. We train this conditional diffusion model using Classifier Free Guidance (CFG) technique. At generation time, we use reverse diffusion to iteratively generate samples. In this work we are interested in size extrapolation. Hence we generate samples at larger sizes the CNN based score network. However, the samples produced at the extrapolated sizes are not accurate XY model samples. They instead provide a veyr good warm start for MCMC which ultimately leads to faster thermalization as discussed in the paper.
 
-![Correlations Correction](assets/correlations-correction-multiple-temperatures.pdf)
-
 ## Getting started
 
 Create and activate a virtual environment and install the project dependencies from `requirements.txt`. The `config.py` file as training and sampling configurations which can be modified. Additionally, note that `wandb` has been used for experiment tracking. To generate the data using Wolff MCMC please run the following:
