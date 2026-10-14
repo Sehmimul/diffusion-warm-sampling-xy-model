@@ -57,7 +57,7 @@ If you use the code, please consider citing
 @inproceedings{
 hoque2026diffusionwarm,
 title={Diffusion-warm sampling of the {XY} model enables fast thermalization at scale},
-author={Anonymous},
+author={Sehmimul Hoquea and Roger Melko and Pooya Ronagh},
 booktitle={The Fortieth Annual Conference on Neural Information Processing Systems},
 year={2026},
 url={https://openreview.net/forum?id=3vCVCEk7Px}
