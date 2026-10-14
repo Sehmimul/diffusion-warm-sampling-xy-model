@@ -8,10 +8,10 @@ class ModelConfig(BaseModel):
     num_epochs: int = 60000
     display_epoch: int = 1
     optimizer: str = "adam"
-    project_name: str = "diffusion-xy-1"
+    project_name: str = "diffusion-xy"
     sigma_min: float = 0.01
     sigma_max: float = 50
-    N: int = 2
+    N: int = 500
     eps: float = 1e-5
     train_split: float = 0.7
     val_split: float = 0.27
@@ -24,7 +24,7 @@ class SamplingConfig(BaseModel):
     trained_size: int = 20
     L: int = 60
 
-    beta_list: list = [0.5,0.6, 1.4] #[0.5, 0.6, 0.7, 0.8, 1, 1.2, 1.3, 1.4, 1.5, 1.6]
+    beta_list: list = [0.5, 0.6, 0.7, 0.8, 1, 1.2, 1.3, 1.4, 1.5, 1.6]
 
     num_samples: int = 1000
 
@@ -32,7 +32,7 @@ class SamplingConfig(BaseModel):
     checkpoint: str = 'model_checkpoint'
 
     # wandb project
-    project_name: str = "mcmc"#sampling
+    project_name: str = "diffusion-xy-sampling"
 
     # classifier free guidance
     cfg: bool = True
@@ -63,6 +63,5 @@ class GaussianMixtureDataConfig(BaseModel):
     beta: int = 1
 
 class XYDataConfig(BaseModel):
-    # beta: float = 0.85
     betas: list = [0.7, 0.8]
     L: list = [20]
