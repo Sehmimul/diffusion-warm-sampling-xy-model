@@ -10,10 +10,6 @@ def xy_data(config, device, beta = 2, L = 3):
     # Subtract
     data = data - mean_per_sample
     dataset = DataSet(data = data)
-    # dataset_list = []
-    # for l in L:
-    #     dataset_list.append(TensorDataset(torch.from_numpy(np.load('sandbox/assets/samples_beta_{}_L_{}.npy'.format(beta,l))).to(device)))
-    # dataset = ConcatDataset(dataset_list)
 
     # Split sizes
     train_size = int(config.train_split * len(dataset))
