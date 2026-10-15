@@ -10,6 +10,7 @@ from lib.metrics.vortex import vortex_density_torch
 from lib.metrics.magnetization import xy_magnetization_susceptibility
 from lib.wolff_correction import get_metrics
 from rich import print as pprint
+import os
 
 # The code is based on the Julia implementation of the Wolff algorithm for the XY model which can be found at https://github.com/mschuylermoss/705Project/tree/main.
 
@@ -462,6 +463,10 @@ if __name__ == "__main__":
         spin_stiffness_function=spin_stiffness,
         sample_every=10,
     )
+
+    data_folder = "assets/data"
+    if not os.path.exists(data_folder):
+        os.makedirs(data_folder)
 
     np.save("assets/data/wolff_samples_beta_{}_L_{}.npy".format(beta, L), np.array(samples))
 
