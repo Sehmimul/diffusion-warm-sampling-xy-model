@@ -16,7 +16,7 @@ class ModelConfig(BaseModel):
     train_split: float = 0.7
     val_split: float = 0.27
     variational = False
-    pre_trained = True
+    pre_trained = False
     checkpoint_name = 'model_checkpoint'
 
 class SamplingConfig(BaseModel):

@@ -22,7 +22,7 @@ python3 wolff_mcmc.py
 To run the train script, please run the following commands which saves a checkpoint in `asssets/`:
 
 ```bash
-python3 run_lib.py --data_type xy
+python3 train.py --data_type xy
 ```
 
 To generate samples using a trained model, please run the following command and the experiment results can be trackked through wandb:
@@ -45,9 +45,10 @@ The repository contains the implementation and experiment files for this project
 | `sandbox/` | Scripts for future work and testing |
 | `config.py` | Configuration file for training and sampling |
 | `requirements.txt`  | Required libraries |
-| `run_lib.py` | Main training script |
+| `train.py` | Main training script |
 | `sample.py` | Sampling script |
 | `wolff_mcmc.py` | Script to generate data using Wolff MCMC |
+| `training_step.py` | One step of training |
 
 ## Citation
 
