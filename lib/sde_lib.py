@@ -106,7 +106,6 @@ class VESDE_test:
     return drift, diffusion
 
   def marginal_prob(self, x, t):
-    # understand
     std = self.sigma_min * (self.sigma_max / self.sigma_min) ** t
     mean = x
     return mean, std
