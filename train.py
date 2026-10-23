@@ -106,7 +106,3 @@ if __name__ == "__main__":
                 torch.save(model.state_dict(), "assets/model_checkpoint.pth")
 
             run.log({"loss/train_loss": np.mean(loss_array), "loss/validation_loss": np.mean(val_loss_array)})
-
-    for batch in test_loader:
-        test_loss = train_step(config, batch, model, sde, optim, train = False)
-        pprint("Test loss is {}".format(test_loss.item()))
