@@ -13,7 +13,7 @@ Then we are able to generate samples at larger sizes using the trained network. 
 
 ## Getting started
 
-Create and activate a virtual environment with `Python 3.6.8` and install the project dependencies from `requirements.txt`. The `config.py` file as training and sampling configurations which can be modified. Additionally, note that `wandb` has been used for experiment tracking. To generate the data using Wolff MCMC please run the following:
+Create and activate a virtual environment with `Python 3.6.8` and install the project dependencies from `requirements.txt`. The `config.py` file as training and sampling configurations which can be modified. Additionally, note that `wandb` has been used for experiment tracking. To generate the data using Wolff MCMC please run the following and please define the config within the `wolff_mcmc.py` script:
 
 ```bash
 python3 wolff_mcmc.py
