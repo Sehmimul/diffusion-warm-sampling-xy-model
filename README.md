@@ -8,11 +8,12 @@ We introduce a novel technique for scalable sampling of spin-system states with 
 
 ## How it works
 
-A forward process gradually adds noise to equilibrium spin configurations, whose angles live on the torus. A neural network learns to estimate the score of the resulting noisy distributions at each noise level. Temperature is also used as a conditional variable to avoid training different models at different temperature. We train this conditional diffusion model using Classifier Free Guidance (CFG) technique. At generation time, we use reverse diffusion to iteratively generate samples. In this work we are interested in size extrapolation. Hence we generate samples at larger sizes the CNN based score network. However, the samples produced at the extrapolated sizes are not accurate XY model samples. They instead provide a veyr good warm start for MCMC which ultimately leads to faster thermalization as discussed in the paper.
+A forward process gradually adds noise to equilibrium spin configurations, whose angles live on the torus. A neural network learns to estimate the score of the resulting noisy distributions at each noise level. Temperature is also used as a conditional variable to avoid training different models at different temperature. We train this conditional diffusion model using Classifier Free Guidance (CFG) technique. At generation time, we use reverse diffusion to iteratively generate samples. In this work we are interested in size extrapolation. Hence we use a CNN based score network as they allow size extrapolation. We further impose constraints on the score network to make it rotationally invariant and with periodic boundary conditions to account for the symmetry in the XY model data samples.
+Then we are able to generate samples at larger sizes using the trained network. However, the samples produced at the extrapolated sizes are not accurate XY model samples. They instead provide a very good warm start for MCMC which ultimately leads to faster thermalization as discussed in the paper.
 
 ## Getting started
 
-Create and activate a virtual environment and install the project dependencies from `requirements.txt`. The `config.py` file as training and sampling configurations which can be modified. Additionally, note that `wandb` has been used for experiment tracking. To generate the data using Wolff MCMC please run the following:
+Create and activate a virtual environment with `Python 3.6.8` and install the project dependencies from `requirements.txt`. The `config.py` file as training and sampling configurations which can be modified. Additionally, note that `wandb` has been used for experiment tracking. To generate the data using Wolff MCMC please run the following:
 
 ```bash
 python3 wolff_mcmc.py
@@ -25,7 +26,7 @@ To run the train script, please run the following commands which saves a checkpo
 python3 train.py --data_type xy
 ```
 
-To generate samples using a trained model, please run the following command and the experiment results can be trackked through wandb:
+To generate samples using a trained model, please run the following command and the experiment results can be tracked through wandb:
 
 ```bash
 python3 sample.py
